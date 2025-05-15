@@ -1,0 +1,1 @@
+- [참고링크](https://github.com/uygarkurt/Fine-Tune-VLMs/blob/main/fine-tune-vlms-qwen.ipynb)
