@@ -1,0 +1,28 @@
+[project]
+name = "qwen-train"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10"
+
+dependencies = [
+    "accelerate>=1.7.0",
+    "bitsandbytes>=0.45.5",
+    "datasets>=3.6.0",
+    "matplotlib>=3.10.3",
+    "ninja>=1.11.1.4",
+    "packaging>=25.0",
+    "qwen-vl-utils[decord]==0.0.8",
+    "torch==2.3.0+cu118",
+    "torchvision==0.18.0+cu118",
+    "transformers>=4.51.3",
+]
+
+[[tool.uv.index]]          # PyTorch 전용 인덱스
+name = "pytorch-cu118"
+url  = "https://download.pytorch.org/whl/cu118"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu118" }
+torchvision = { index = "pytorch-cu118" }
