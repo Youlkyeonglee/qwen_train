@@ -37,6 +37,7 @@ def format_data(sample):
             "content": [{"type": "text", "text": sample["label"][0]}],
         },
     ]
+
 def text_generator(sample_data, processor, model, device, MAX_SEQ_LEN):
     text = processor.apply_chat_template(
         sample_data[0:2], tokenize=False, add_generation_prompt=True
@@ -207,14 +208,14 @@ def main():
     )
     collate_sample = [train_dataset[0], train_dataset[1]] # for batch size 2.
 
-    collated_data = collate_fn(collate_sample)
+    collated_data = collate_fn(collate_sample, processor)
     print(collated_data.keys())  # dict_keys(['input_ids', 'attention_mask', 'pixel_values', 'labels'])    
     trainer = SFTTrainer(
         model=model,
         args=training_args,
         train_dataset=train_dataset,
         eval_dataset=eval_dataset,
-        data_collator=collate_fn,
+        data_collator=lambda examples: collate_fn(examples, processor),
         peft_config=peft_config,
         processing_class=processor.tokenizer,
     )

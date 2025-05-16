@@ -7,6 +7,8 @@ from peft import LoraConfig, get_peft_model
 from trl import SFTConfig, SFTTrainer
 from transformers import Qwen2_5_VLForConditionalGeneration, AutoTokenizer, AutoProcessor
 from datasets import load_dataset
+from PIL import Image
+import matplotlib.pyplot as plt
 
 def text_generator(sample_data, processor, model, device, MAX_SEQ_LEN):
     text = processor.apply_chat_template(
@@ -103,15 +105,24 @@ if device == "cuda":
         bnb_4bit_quant_type="nf4",
         bnb_4bit_compute_dtype=torch.bfloat16
     )
-    model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+    pretrained_model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
         MODEL_ID, 
         device_map="auto", 
         quantization_config=bnb_config,
         use_cache=True
         )
-
+    fine_tuned_model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+        MODEL_ID, 
+        device_map="auto", 
+        quantization_config=bnb_config,
+        use_cache=True
+        )
 else:
-    model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+    pretrained_model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+        MODEL_ID, 
+        use_cache=True
+        )
+    fine_tuned_model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
         MODEL_ID, 
         use_cache=True
         )
@@ -119,9 +130,9 @@ else:
 processor = AutoProcessor.from_pretrained(MODEL_ID)
 processor.tokenizer.padding_side = "right"
 
-print(f"Before adapter parameters: {model.num_parameters()}")
-model.load_adapter("./output")
-print(f"After adapter parameters: {model.num_parameters()}")
+print(f"Before adapter parameters: {fine_tuned_model.num_parameters()}")
+fine_tuned_model.load_adapter("./output")
+print(f"After adapter parameters: {fine_tuned_model.num_parameters()}")
 
 _, _, test_dataset = load_dataset("HuggingFaceM4/ChartQA", 
                                                          split=["train[:1%]", "val[:1%]", "test[:1%]"])
@@ -140,7 +151,48 @@ print("-"*30)
 
 test_dataset = [format_data(sample) for sample in test_dataset]
 
-sample_data = test_dataset[0]
-generated_text, actual_answer = text_generator(sample_data, processor, model, device, MAX_SEQ_LEN=128)
-print(f"Generated Answer: {generated_text}")
-print(f"Actual Answer: {actual_answer}")
+# 결과를 저장할 리스트
+pretrained_results = []
+fine_tuned_results = []
+actual_answers = []
+images = []
+
+# 여러 샘플에 대해 결과 수집 (예: 처음 3개 샘플)
+for i in range(min(3, len(test_dataset))):
+    sample_data = test_dataset[i]
+    image = sample_data[1]["content"][0]["image"]
+    
+    # Pretrained 모델 결과
+    pretrained_text, actual_answer = text_generator(sample_data, processor, pretrained_model, device, MAX_SEQ_LEN=128)
+    pretrained_results.append(pretrained_text)
+    
+    # Fine-tuned 모델 결과
+    fine_tuned_text, _ = text_generator(sample_data, processor, fine_tuned_model, device, MAX_SEQ_LEN=128)
+    fine_tuned_results.append(fine_tuned_text)
+    
+    actual_answers.append(actual_answer)
+    images.append(image)
+
+# 결과 시각화
+for i in range(len(pretrained_results)):
+    plt.figure(figsize=(15, 10))
+    
+    # 이미지 표시
+    plt.subplot(2, 1, 1)
+    plt.imshow(images[i])
+    plt.axis('off')
+    plt.title(f"Sample {i+1} - Input Image")
+    
+    # 결과 텍스트 표시
+    plt.subplot(2, 1, 2)
+    plt.axis('off')
+    result_text = f"Pretrained Model:\n{pretrained_results[i]}\n\n" \
+                 f"Fine-tuned Model:\n{fine_tuned_results[i]}\n\n" \
+                 f"Actual Answer:\n{actual_answers[i]}"
+    plt.text(0.1, 0.5, result_text, fontsize=10, va='center')
+    
+    plt.tight_layout()
+    plt.show()
+
+# 메모리 정리
+clear_memory()
